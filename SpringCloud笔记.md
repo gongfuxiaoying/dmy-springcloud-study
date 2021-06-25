@@ -271,6 +271,7 @@ Spring Cloud侧重于为典型用例提供良好的开箱即用体验，并提�
         <junit-version>4.13.1</junit-version>
         <lombok-version>1.18.12</lombok-version>
         <logback.core-version>1.2.3</logback.core-version>
+        <logging-version>2.4.0</logging-version>
     </properties>
     <dependencyManagement>
         <dependencies>
@@ -291,6 +292,12 @@ Spring Cloud侧重于为典型用例提供良好的开箱即用体验，并提�
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
+            <!--springboot使用日志:默认为logback,logback-spring.xml加载早于application.yml-->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-logging</artifactId>
+                <version>${logging-version}</version>
+            </dependency>
             <!--mybatis的springboot启动器-->
             <dependency>
                 <groupId>org.mybatis.spring.boot</groupId>
@@ -309,12 +316,7 @@ Spring Cloud侧重于为典型用例提供良好的开箱即用体验，并提�
                 <artifactId>log4j</artifactId>
                 <version>${log4j-version}</version>
             </dependency>
-            <!--日志测试-->
-            <dependency>
-                <groupId>ch.qos.logback</groupId>
-                <artifactId>logback-core</artifactId>
-                <version>${logback.core-version}</version>
-            </dependency>
+
             <dependency>
                 <groupId>junit</groupId>
                 <artifactId>junit</artifactId>
@@ -336,8 +338,419 @@ Spring Cloud侧重于为典型用例提供良好的开箱即用体验，并提�
 </project>
 ```
 
+
+
+## 创建数据库
+
+建表
+
+```sql
+create table dept
+(
+    deptno    bigint auto_increment
+        primary key,
+    deptname  varchar(100) null,
+    db_source varchar(50)  null
+)
+    comment '科室'
+```
+
+插入数据
+
+```sql
+insert into dept(deptname, db_source) values ('开发部',database());
+insert into dept(deptname, db_source) values ('维修部',database());
+insert into dept(deptname, db_source) values ('人事部',database());
+insert into dept(deptname, db_source) values ('销售部',database());
+insert into dept(deptname, db_source) values ('后勤部',database());
+```
+
+
+
 ### springcloud-api
+
+建立dept的pojo类
+
+```Java
+package com.study.springcloud.pojo;
+
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.experimental.Accessors;
+
+import java.io.Serializable;
+
+/**
+ * 实体类
+ */
+@Data
+@NoArgsConstructor //无参构造器
+@Accessors(chain = true) //链式写法 dept.setDeptno(11).setDeptname("开发部");
+public class Dept implements Serializable {
+    private Long deptno;
+    private String deptname;
+    /**
+     * 当前数据存在于哪一个数据库
+     * 微服务是一个服务对应一个数据库,同一个信息可能存在于不同的数据库
+     */
+    private String dbSource;
+
+    public Dept(String dname) {
+        this.deptname = dname;
+    }
+}
+
+```
+
+
 
 ### springcloud-provider-8001
 
+#### 项目依赖
+
+首先获取api模块的实体类
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <artifactId>dmy-springcloud-study</artifactId>
+        <groupId>org.example</groupId>
+        <version>1.0-SNAPSHOT</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>springcloud-provider-8001</artifactId>
+
+    <properties>
+        <maven.compiler.source>8</maven.compiler.source>
+        <maven.compiler.target>8</maven.compiler.target>
+    </properties>
+    <dependencies>
+        <!--配置api module,获取api模块的实体类-->
+        <dependency>
+            <groupId>org.example</groupId>
+            <artifactId>springcloud-api</artifactId>
+            <version>1.0-SNAPSHOT</version>
+        </dependency>
+
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.alibaba</groupId>
+            <artifactId>druid</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.mybatis.spring.boot</groupId>
+            <artifactId>mybatis-spring-boot-starter</artifactId>
+        </dependency>
+        <!--父工程:spring-boot-dependencies-->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+    </dependencies>
+</project>
+```
+
+#### 项目配置文件
+
+application.yml
+
+```yml
+server:
+  port: 8001
+
+
+mybatis:
+  type-aliases-package: com.study.springcloud.dao
+  config-location:
+    classpath:mybatis/mybatis-config.xml #注意这里classpath:后没有空格
+  mapper-locations:
+    classpath:mybatis/mapper/*.xml  #注意这里classpath:后没有空格
+
+
+# spring配置
+spring:
+  application:
+    name: springcloud-provider-dept
+  datasource:
+    type: com.alibaba.druid.pool.DruidDataSource
+    driver-class-name: com.mysql.cj.jdbc.Driver
+#    url: jdbc:mysql://localhost:3306/cloud01?useUnicode=true&characterEncoding=utf-8
+    url: jdbc:mysql://127.0.0.1:3306/cloud01?useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=GMT%2B8&nullCatalogMeansCurrent=true
+    username: root
+    password: baoqy
+```
+
+**注意classpath:后没有空格,否则会报错:Invalid bound statement (not found):**
+
+mybatis配置:mybatis-config.xml
+
+```xml
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE configuration
+        PUBLIC "-//mybatis.org//DTD Config 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-config.dtd">
+<configuration>
+    <settings>
+        <setting name="cacheEnabled" value="true"/>
+    </settings>
+</configuration>
+```
+
+#### Dao接口
+
+```Java
+package com.study.springcloud.dao;
+
+import com.study.springcloud.pojo.Dept;
+import org.apache.ibatis.annotations.Mapper;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+
+@Mapper
+@Repository
+public interface DeptDao {
+    public boolean addDept(Dept dept);
+    public boolean delDeptById(Long dept);
+
+    public Dept queryById(Long id);
+    public List<Dept> queryAll();
+}
+```
+
+#### mapper映射文件:
+
+DeptMapper.xml
+
+```xml
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.study.springcloud.dao.DeptDao">
+    <insert id="addDept" parameterType="myDept">
+        insert into dept(deptname,db_source)
+        values(#{deptname},DATABASE())
+    </insert>
+
+    <select id="queryById" parameterType="Long" resultType="myDept">
+        select * from dept where deptno=#{deptno}
+    </select>
+
+
+    <select id="queryAll" resultType="myDept">
+        select * from dept
+    </select>
+</mapper>
+```
+
+#### Service接口
+
+```Java
+package com.study.springcloud.servcie;
+
+import com.study.springcloud.pojo.Dept;
+
+import java.util.List;
+
+public interface DeptService {
+    public boolean addDept(Dept dept);
+    public boolean delDeptById(Long id);
+
+    public Dept queryById(Long id);
+    public List<Dept> queryAll();
+}
+
+```
+
+Service实现类
+
+```Java
+package com.study.springcloud.servcie;
+
+import com.study.springcloud.dao.DeptDao;
+import com.study.springcloud.pojo.Dept;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+public class DeptServiceImpl implements DeptService {
+    @Autowired
+    private DeptDao deptDao;
+
+    @Override
+    public boolean addDept(Dept dept) {
+        return deptDao.addDept(dept);
+    }
+
+    @Override
+    public boolean delDeptById(Long id) {
+        deptDao.delDeptById(id);
+        return false;
+    }
+
+    @Override
+    public Dept queryById(Long id) {
+        Dept dept = deptDao.queryById(id);
+        return dept;
+    }
+
+    @Override
+    public List<Dept> queryAll() {
+        List<Dept> depts = deptDao.queryAll();
+        return depts;
+    }
+}
+```
+
+Controller提供restful服务
+
+```Java
+package com.study.springcloud.controller;
+
+import com.study.springcloud.pojo.Dept;
+import com.study.springcloud.servcie.DeptService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+
+/**
+ * 提供restful服务
+ */
+@RestController
+public class DeptController {
+    @Autowired
+    private DeptService deptService;
+
+    @PostMapping("/dept/add")
+    public boolean addDept(Dept dept){
+        return deptService.addDept(dept);
+    }
+    @GetMapping("/dept/get/{id}")
+    public Dept get(@PathVariable("id") Long id){
+        return deptService.queryById(id);
+    }
+
+    @GetMapping("/dept/list")
+    public List<Dept> queryAll(){
+        return deptService.queryAll();
+    }
+}
+```
+
+
+
 ### springcloud-consumer-80
+
+controller中访问生产者的服务:spring中使用RestTemplate模板进行restful操作
+
+首先配置RestTemplate
+
+```Java
+package com.study.springcloud.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.client.RestTemplate;
+
+@Configuration
+public class ConfigBean {
+    @Bean
+    public RestTemplate getRestTemplate(){
+        return new RestTemplate();
+    }
+}
+```
+
+
+
+然后使用RestTemplate
+
+```java
+package com.study.springcloud.controller;
+
+import com.study.springcloud.pojo.Dept;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestTemplate;
+
+import java.util.List;
+
+/**
+ * 消费者不需要由service层
+ */
+@RestController
+public class DeptConsumerController {
+    @Autowired
+    private RestTemplate restTemplate;
+    private static final String REST_URL_PRIFIX = "http://localhost:8001";
+    //restTemplate 一般需要（url，实体，Class<T> responseType）
+    @RequestMapping("/consumer/dept/get/{id}")
+    public Dept get(@PathVariable("id") Long id){
+        //"/dept/get/" 由服务提供者提供
+        return restTemplate.getForObject(REST_URL_PRIFIX+"/dept/get/" + id, Dept.class);
+    }
+
+    @RequestMapping("/consumer/dept/list")
+    public List<Dept> deptList(){
+        //"/dept/get/" 由服务提供者提供
+        return restTemplate.getForObject(REST_URL_PRIFIX+"/dept/list", List.class);
+    }
+
+    @RequestMapping("/consumer/dept/add")
+    public Boolean addDept(Dept dept){
+        //"/dept/get/" 由服务提供者提供
+        return restTemplate.postForObject(REST_URL_PRIFIX+"/dept/add" , dept,Boolean.class);
+    }
+}
+
+```
+
+启动类:
+
+```Java
+package com.study.springcloud;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class ConsumerApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(ConsumerApplication.class, args);
+    }
+}
+```
+
+启动provider:8001服务,然后再启动consumer:80服务,然后访问
+
+```url
+http://localhost/consumer/dept/list
+
+http://localhost/consumer/dept/get/2
+
+http://localhost/consumer/dept/add?deptname=哈哈&dbSource=cloud01 需要post请求
+```
+
+
+

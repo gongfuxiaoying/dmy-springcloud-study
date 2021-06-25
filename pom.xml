@@ -26,6 +26,8 @@
         <junit-version>4.13.1</junit-version>
         <lombok-version>1.18.12</lombok-version>
         <logback.core-version>1.2.3</logback.core-version>
+        <logging-version>2.4.0</logging-version>
+        <druid-version>1.2.6</druid-version>
     </properties>
     <dependencyManagement>
         <dependencies>
@@ -46,6 +48,12 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
+            <!--springboot使用日志:默认为logback,logback-spring.xml加载早于application.yml-->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-logging</artifactId>
+                <version>${logging-version}</version>
+            </dependency>
             <!--mybatis的springboot启动器-->
             <dependency>
                 <groupId>org.mybatis.spring.boot</groupId>
@@ -58,18 +66,18 @@
                 <artifactId>mysql-connector-java</artifactId>
                 <version>${mysql-version}</version>
             </dependency>
+            <dependency>
+                <groupId>com.alibaba</groupId>
+                <artifactId>druid</artifactId>
+                <version>${druid-version}</version>
+            </dependency>
             <!--日志-->
             <dependency>
                 <groupId>log4j</groupId>
                 <artifactId>log4j</artifactId>
                 <version>${log4j-version}</version>
             </dependency>
-            <!--日志测试-->
-            <dependency>
-                <groupId>ch.qos.logback</groupId>
-                <artifactId>logback-core</artifactId>
-                <version>${logback.core-version}</version>
-            </dependency>
+
             <dependency>
                 <groupId>junit</groupId>
                 <artifactId>junit</artifactId>
@@ -83,6 +91,7 @@
                 <artifactId>lombok</artifactId>
                 <version>${lombok-version}</version>
             </dependency>
+
         </dependencies>
     </dependencyManagement>
     <build>
